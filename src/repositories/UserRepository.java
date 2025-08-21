@@ -1,36 +1,50 @@
+/*
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Licenses/license-default.txt to change this license
+ * Click nbfs://nbhost/SystemFileSystem/Templates/Classes/Class.java to edit this template
+ */
 package repositories;
 
-import java.io.IOException;
-import java.sql.*;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
 import sql.SqlConnection;
 
-public class UserRepository{
+public class UserRepository {
 
-    SqlConnection sqlConnection;
+    private SqlConnection dbc;
+    private Connection con;
 
     public UserRepository() {
-        this.sqlConnection= new SqlConnection();
+        try {
+            this.dbc = new SqlConnection();
+            this.con = this.dbc.getConnection();
+        } catch (SQLException ex) {
+            System.getLogger(UserRepository.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+        }
+        
     }
 
-    private Connection getConnection() throws SQLException {
-        return sqlConnection.getConnection();
-    }
+    public Boolean CheckCredentials(String user, String pass) {
+        try {
+            String query = "SELECT * FROM users WHERE username='" + user + "' AND password='" + pass + "'";
+            Statement myQuery = con.createStatement();
+            ResultSet rs = myQuery.executeQuery(query);
 
-    public boolean checkCredentials(String user, String pass){
-        String query = "SELECT username FROM users WHERE username = ? AND password = ?";
-        try (Connection con = getConnection();
-             PreparedStatement stmt = con.prepareStatement(query)) {
-
-            stmt.setString(1, user);
-            stmt.setString(2, pass);
-
-            try (ResultSet rs = stmt.executeQuery()) {
-                return rs.next();
+            if (rs.next()) {
+                String data = "";
+                for (int i = 1; i <= 3; i++) {
+                    data += rs.getString(i) + ":";
+                }
+                System.out.println("USER DATA: " + data);
+                return true;
+            } else {
+                return false;
             }
-
         } catch (SQLException e) {
-            System.err.println("Error al verificar credenciales: " + e.getMessage());
+            e.printStackTrace();
             return false;
         }
     }
+
 }
