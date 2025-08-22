@@ -41,10 +41,8 @@ public class Connection {
     private void readMessages() {
         try {
             String message;
-            while (isActive ) {
-                message = dis.readUTF();
-                if(message.isEmpty()) continue;
-                if (message.equalsIgnoreCase("exit")) {
+            while (isActive && (message = dis.readUTF()) != null) {
+                if ("Exit".equals(message)) {
                     System.out.println("Cliente " + socket.getInetAddress() + " solicita desconexión");
                     close();
                     break;
@@ -133,6 +131,11 @@ public class Connection {
             System.out.println("Error cerrando conexión: " + e.getMessage());
         }
     }
+    
+    public boolean isActive() {
+        return isActive;
+    }
+    
     public Thread getReaderThread() {
         return readerThread;
     }
@@ -143,5 +146,13 @@ public class Connection {
     
     public static int getActiveConnectionsCount() {
         return activeConnections.size();
+    }
+    
+    public static void closeAllConnections() {
+        synchronized (activeConnections) {
+            for (Connection connection : new ArrayList<>(activeConnections)) {
+                connection.close();
+            }
+        }
     }
 }

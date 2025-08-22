@@ -8,11 +8,11 @@ import java.util.Properties;
 
 public class SqlConnection { 
 
-    public static final String URL = "jdbc:mysql://localhost:3306/supercomputo";
+    public static final String URL = "jdbc:mysql://localhost:3306/restordb";
 
     public static final String USER = "root";
 
-    public static final String PSWD = "123456";
+    public static final String PSWD = "Win2002Racedb$";
 
 
     public Connection getConnection() throws SQLException{
@@ -33,4 +33,4 @@ public class SqlConnection {
         return connection;
     } 
 
-} 
+}

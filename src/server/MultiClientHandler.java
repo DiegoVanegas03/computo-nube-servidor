@@ -55,14 +55,26 @@ public class MultiClientHandler extends Thread{
     }
 
     public boolean authenticate() throws IOException {
-            // Leer datos del cliente y procesarlos para terminar teniendo un JSON
-            DataInputStream reader = new DataInputStream(socket.getInputStream());
-            String plainTextAuth = reader.readUTF();
+        DataInputStream reader = new DataInputStream(socket.getInputStream());
+        String plainTextAuth = reader.readUTF();
 
-            JSONObject auth = new JSONObject(plainTextAuth);
-            // Procesar autenticación
-            UserRepository userRepo = new UserRepository();
-            return userRepo.checkCredentials(auth.getString("username").trim(),
-                    auth.getString("password").trim());
+        JSONObject auth;
+        try {
+            auth = new JSONObject(plainTextAuth);
+        } catch (Exception e) {
+            System.out.println("Error: El cliente envió un JSON mal formado.");
+            return false;
+        }
+
+        if (!auth.has("username") || !auth.has("password")) {
+            System.out.println("Error: El JSON no contiene los campos 'username' y 'password'.");
+            return false;
+        }
+
+        UserRepository userRepo = new UserRepository();
+        return userRepo.CheckCredentials(
+                auth.getString("username").trim(),
+                auth.getString("password").trim()
+        );
     }
 }
