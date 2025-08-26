@@ -6,6 +6,12 @@ out/
 ## No code client
 src/client/
 
+# Environment variables
+.env
+
+# Build directory
+build/
+
 ### Eclipse ###
 .apt_generated
 .classpath
