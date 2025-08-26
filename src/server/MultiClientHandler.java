@@ -4,12 +4,14 @@ import org.json.JSONObject;
 import repositories.UserRepository;
 
 import java.io.DataInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
 
 public class MultiClientHandler extends Thread{
     private final Socket socket;
     private Connection connection;
+    private String authenticatedUsername;
     
     public MultiClientHandler(Socket socket){
         this.socket = socket;
@@ -32,11 +34,12 @@ public class MultiClientHandler extends Thread{
                 return;
             };
 
-            connection = new Connection(socket);
+            connection = new Connection(socket, authenticatedUsername);
             connection.start();
             
-            connection.sendMessage("Escribe 'Exit' para salir.");
-            connection.sendMessage("Usuarios conectados: " + Connection.getActiveConnectionsCount());
+            // Enviar mensajes de bienvenida en formato JSON
+            connection.sendMessage(connection.createServerMessage("Escribe JSON con 'action': 'exit' para salir."));
+            connection.sendMessage(connection.createServerMessage("Usuarios conectados: " + Connection.getActiveConnectionsCount()));
       
             try {
                 // Esperar a que ambos hilos terminen
@@ -63,18 +66,37 @@ public class MultiClientHandler extends Thread{
             auth = new JSONObject(plainTextAuth);
         } catch (Exception e) {
             System.out.println("Error: El cliente envió un JSON mal formado.");
+            sendAuthErrorResponse("Error: El JSON de autenticación está mal formado");
             return false;
         }
 
         if (!auth.has("username") || !auth.has("password")) {
             System.out.println("Error: El JSON no contiene los campos 'username' y 'password'.");
+            sendAuthErrorResponse("Error: El JSON debe contener los campos 'username' y 'password'");
             return false;
         }
 
         UserRepository userRepo = new UserRepository();
-        return userRepo.CheckCredentials(
-                auth.getString("username").trim(),
-                auth.getString("password").trim()
-        );
+        String username = auth.getString("username").trim();
+        boolean isAuthenticated = userRepo.CheckCredentials(username, auth.getString("password").trim());
+        
+        if (isAuthenticated) {
+            this.authenticatedUsername = username;
+        } else {
+            sendAuthErrorResponse("Error: Credenciales inválidas");
+        }
+        
+        return isAuthenticated;
+    }
+    
+    private void sendAuthErrorResponse(String errorMessage) throws IOException {
+        JSONObject errorResponse = new JSONObject();
+        errorResponse.put("user", "server");
+        errorResponse.put("time", java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        errorResponse.put("info", new JSONObject().put("status", "authentication_failed").put("message", errorMessage));
+        
+        DataOutputStream writer = new DataOutputStream(socket.getOutputStream());
+        writer.writeUTF(errorResponse.toString());
+        writer.flush();
     }
 }

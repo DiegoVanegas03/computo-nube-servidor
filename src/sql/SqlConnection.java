@@ -1,36 +1,36 @@
 package sql;
 
+
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.Properties;
+import util.EnvLoader;
 
 
-public class SqlConnection { 
+public class SqlConnection {
 
-    public static final String URL = "jdbc:mysql://localhost:3306/restordb";
+    private static final String DB_HOST = EnvLoader.get("DB_HOST");
+    private static final String DB_PORT = EnvLoader.get("DB_PORT");
+    private static final String DB_NAME = EnvLoader.get("DB_NAME");
+    private static final String DB_USER = EnvLoader.get("DB_USER");
+    private static final String DB_PASSWORD = EnvLoader.get("DB_PASSWORD");
 
-    public static final String USER = "root";
-
-    public static final String PSWD = "Win2002Racedb$";
-
-
-    public Connection getConnection() throws SQLException{
-
+    public Connection getConnection() throws SQLException {
         Connection connection;
         Properties connectionProps = new Properties();
-        connectionProps.setProperty("user",USER);
-        connectionProps.setProperty("password",PSWD);
-        try{
-            connection = DriverManager.getConnection(URL, connectionProps);
+        connectionProps.setProperty("user", DB_USER);
+        connectionProps.setProperty("password", DB_PASSWORD);
+        String url = String.format("jdbc:mysql://%s:%s/%s", DB_HOST, DB_PORT, DB_NAME);
+        try {
+            connection = DriverManager.getConnection(url, connectionProps);
             if (connection != null) {
                 System.out.println("Conexión exitosa a la base de datos");
             }
-        }catch (SQLException e) {
+        } catch (SQLException e) {
             System.err.println("Error de conexión a la base de datos: " + e.getMessage());
             throw e;
         }
         return connection;
-    } 
-
+    }
 }

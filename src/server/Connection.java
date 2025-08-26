@@ -1,9 +1,12 @@
 package server;
 
+import org.json.JSONObject;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.Socket;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -14,19 +17,21 @@ public class Connection {
     private final Socket socket;
     private final DataInputStream dis;
     private final DataOutputStream dos;
+    private final String username;
     private Thread readerThread;
     private Thread writerThread;
     private volatile boolean isActive;
     private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
     private static final List<Connection> activeConnections = Collections.synchronizedList(new ArrayList<>());
     
-    public Connection(Socket socket) throws IOException {
+    public Connection(Socket socket, String username) throws IOException {
         this.socket = socket;
+        this.username = username;
         this.dis = new DataInputStream(socket.getInputStream());
         this.dos = new DataOutputStream(socket.getOutputStream());
         this.isActive = true;
         
-        System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress());
+        System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username);
     }
     
     public void start() {
@@ -42,16 +47,28 @@ public class Connection {
         try {
             String message;
             while (isActive && (message = dis.readUTF()) != null) {
-                if ("Exit".equals(message)) {
-                    System.out.println("Cliente " + socket.getInetAddress() + " solicita desconexión");
+                // Verificar si es JSON válido
+                JSONObject messageJson;
+                try {
+                    messageJson = new JSONObject(message);
+                } catch (Exception e) {
+                    System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") envió un mensaje que no es JSON válido: " + message);
+                    sendMessage(createServerMessage("Error: Los mensajes deben ser JSON válido"));
+                    continue;
+                }
+                
+                // Verificar si es comando de salida
+                if (messageJson.has("action") && "exit".equals(messageJson.getString("action"))) {
+                    System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") solicita desconexión");
                     close();
                     break;
                 }
+                
                 broadcastMessage(message, this);
             }
         } catch (IOException e) {
             if (isActive) {
-                System.out.println("Error leyendo mensaje del cliente " + socket.getInetAddress() + ": " + e.getMessage());
+                System.out.println("Error leyendo mensaje del cliente " + socket.getInetAddress() + " (" + username + "): " + e.getMessage());
             }
             close();
         }
@@ -86,8 +103,30 @@ public class Connection {
         }
     }
     
-    public static void broadcastMessage(String message, Connection sender) {
-        String formattedMessage = "Cliente " + sender.getClientAddress() + ": " + message;
+    public String createServerMessage(String info) {
+        JSONObject serverMessage = new JSONObject();
+        serverMessage.put("user", "server");
+        serverMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        serverMessage.put("info", info);
+        return serverMessage.toString();
+    }
+    
+    public static void broadcastMessage(String clientJsonMessage, Connection sender) {
+        // Crear el mensaje del servidor con el formato requerido
+        JSONObject serverMessage = new JSONObject();
+        serverMessage.put("user", sender.username);
+        serverMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        
+        // Parsear el JSON del cliente para incluirlo en info
+        try {
+            JSONObject clientMessage = new JSONObject(clientJsonMessage);
+            serverMessage.put("info", clientMessage);
+        } catch (Exception e) {
+            // Si no es JSON válido, incluir como string
+            serverMessage.put("info", clientJsonMessage);
+        }
+        
+        String formattedMessage = serverMessage.toString();
         
         synchronized (activeConnections) {
             for (Connection connection : activeConnections) {
@@ -97,7 +136,7 @@ public class Connection {
             }
         }
         
-        System.out.println("Broadcast: " + formattedMessage);
+        System.out.println("Broadcast desde " + sender.username + ": " + formattedMessage);
     }
     
     public String getClientAddress() {
