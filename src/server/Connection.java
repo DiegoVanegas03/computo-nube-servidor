@@ -51,6 +51,9 @@ public class Connection {
                 JSONObject messageJson;
                 try {
                     messageJson = new JSONObject(message);
+                    if(!messageJson.has("action") || messageJson.isNull("action")) {
+                        throw new Exception();
+                    };
                 } catch (Exception e) {
                     System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") envió un mensaje que no es JSON válido: " + message);
                     sendMessage(createServerMessage("Error: Los mensajes deben ser JSON válido"));
@@ -58,12 +61,12 @@ public class Connection {
                 }
                 
                 // Verificar si es comando de salida
-                if (messageJson.has("action") && "exit".equals(messageJson.getString("action"))) {
+                if ("exit".equals(messageJson.getString("action"))) {
                     System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") solicita desconexión");
+                    broadcastServerMessage(createServerMessage("Se desconecto el cliente (" + username + ")"), this);
                     close();
                     break;
                 }
-                
                 broadcastMessage(message, this);
             }
         } catch (IOException e) {
@@ -109,6 +112,16 @@ public class Connection {
         serverMessage.put("time", LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
         serverMessage.put("info", info);
         return serverMessage.toString();
+    }
+
+    public void broadcastServerMessage(String message,Connection sender) {
+        synchronized (activeConnections) {
+            for (Connection connection : activeConnections) {
+                if (connection != sender && connection.isActive) {
+                    connection.sendMessage(message);
+                }
+            }
+        }
     }
     
     public static void broadcastMessage(String clientJsonMessage, Connection sender) {
@@ -185,6 +198,12 @@ public class Connection {
     
     public static int getActiveConnectionsCount() {
         return activeConnections.size();
+    }
+
+    public static boolean isLoggedIn(String username){
+        return activeConnections
+                .stream()
+                .anyMatch(connection -> connection.username.equals(username));
     }
     
     public static void closeAllConnections() {

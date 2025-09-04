@@ -30,6 +30,7 @@ public class MultiClientHandler extends Thread{
         try {
             if(!authenticate()){
                 System.out.println("Autenticación fallida para cliente: " + socket.getInetAddress());
+                new DataOutputStream(socket.getOutputStream()).writeUTF("Parece que ingresaste credenciales erroneas o tu usuario ya se encuentra activo.");
                 socket.close();
                 return;
             };
@@ -76,8 +77,16 @@ public class MultiClientHandler extends Thread{
             return false;
         }
 
-        UserRepository userRepo = new UserRepository();
+
+
         String username = auth.getString("username").trim();
+
+        if(Connection.isLoggedIn(username)){
+            System.out.println("Error: El cliente ya se encuentra conectado.");
+            return false;
+        }
+
+        UserRepository userRepo = new UserRepository();
         boolean isAuthenticated = userRepo.CheckCredentials(username, auth.getString("password").trim());
         
         if (isAuthenticated) {
