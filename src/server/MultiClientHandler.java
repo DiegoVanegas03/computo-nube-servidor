@@ -33,15 +33,58 @@ public class MultiClientHandler extends Thread{
                 new DataOutputStream(socket.getOutputStream()).writeUTF("Parece que ingresaste credenciales erroneas o tu usuario ya se encuentra activo.");
                 socket.close();
                 return;
-            };
+            }
 
-            connection = new Connection(socket, authenticatedUsername);
+            // Enviar lista de salas disponibles (archivos en /src/levels)
+            java.io.File levelsDir = new java.io.File("src/levels");
+            String[] salas = levelsDir.list((dir, name) -> name.endsWith(".txt"));
+            org.json.JSONObject salasMsg = new org.json.JSONObject();
+            salasMsg.put("action", "room_list");
+            salasMsg.put("rooms", salas != null ? salas : new String[]{});
+            new DataOutputStream(socket.getOutputStream()).writeUTF(salasMsg.toString());
+
+            // Esperar selección de sala del cliente
+            DataInputStream reader = new DataInputStream(socket.getInputStream());
+            String salaMsg = reader.readUTF();
+            org.json.JSONObject salaJson = new org.json.JSONObject(salaMsg);
+            if (!salaJson.has("action") || !"join_room".equals(salaJson.getString("action")) || !salaJson.has("room")) {
+                new DataOutputStream(socket.getOutputStream()).writeUTF(new org.json.JSONObject().put("error", "Debes enviar {action: 'join_room', room: 'level00.txt'}").toString());
+                socket.close();
+                return;
+            }
+            String salaArchivo = salaJson.getString("room");
+            java.io.File salaFile = new java.io.File("src/levels/" + salaArchivo);
+            if (!salaFile.exists()) {
+                new DataOutputStream(socket.getOutputStream()).writeUTF(new org.json.JSONObject().put("error", "Sala no encontrada").toString());
+                socket.close();
+                return;
+            }
+            java.util.List<String> lines = java.nio.file.Files.readAllLines(salaFile.toPath());
+            String lvn = "";
+            float vh = 0;
+            float gv = 0;
+            StringBuilder mapa = new StringBuilder();
+            for (String line : lines) {
+                if (line.startsWith("lvn-")) lvn = line.substring(4);
+                else if (line.startsWith("vh-")) vh = Float.parseFloat(line.substring(3));
+                else if (line.startsWith("gv-")) gv = Float.parseFloat(line.substring(3));
+                else mapa.append(line).append("\n");
+            }
+            org.json.JSONObject salaInfo = new org.json.JSONObject();
+            salaInfo.put("action", "room_info");
+            salaInfo.put("lvn", lvn);
+            salaInfo.put("vh", vh);
+            salaInfo.put("gv", gv);
+            salaInfo.put("mapa", mapa.toString().trim());
+            new DataOutputStream(socket.getOutputStream()).writeUTF(salaInfo.toString());
+
+            connection = new Connection(socket, authenticatedUsername, salaArchivo);
             connection.start();
-            
+
             // Enviar mensajes de bienvenida en formato JSON
             connection.sendMessage(connection.createServerMessage("Escribe JSON con 'action': 'exit' para salir."));
             connection.sendMessage(connection.createServerMessage("Usuarios conectados: " + Connection.getActiveConnectionsCount()));
-      
+
             try {
                 // Esperar a que ambos hilos terminen
                 connection.getReaderThread().join();

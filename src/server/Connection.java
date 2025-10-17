@@ -18,20 +18,22 @@ public class Connection {
     private final DataInputStream dis;
     private final DataOutputStream dos;
     private final String username;
+    private final String room;
     private Thread readerThread;
     private Thread writerThread;
     private volatile boolean isActive;
     private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
     private static final List<Connection> activeConnections = Collections.synchronizedList(new ArrayList<>());
     
-    public Connection(Socket socket, String username) throws IOException {
+    public Connection(Socket socket, String username, String room) throws IOException {
         this.socket = socket;
         this.username = username;
+        this.room = room;
         this.dis = new DataInputStream(socket.getInputStream());
         this.dos = new DataOutputStream(socket.getOutputStream());
         this.isActive = true;
         
-        System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username);
+        System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username + " Sala: " + room);
     }
     
     public void start() {
@@ -143,13 +145,13 @@ public class Connection {
         
         synchronized (activeConnections) {
             for (Connection connection : activeConnections) {
-                if (connection != sender && connection.isActive) {
+                if (connection != sender && connection.isActive && connection.room.equals(sender.room)) {
                     connection.sendMessage(formattedMessage);
                 }
             }
         }
         
-        System.out.println("Broadcast desde " + sender.username + ": " + formattedMessage);
+        System.out.println("Broadcast desde " + sender.username + " en sala " + sender.room + ": " + formattedMessage);
     }
     
     public String getClientAddress() {
