@@ -180,7 +180,128 @@ javac -cp "lib/mysql-connector-j-9.4.0.jar:lib/json-20240303.jar" -d build $(fin
 java -cp "lib/mysql-connector-j-9.4.0.jar:lib/json-20240303.jar:build" server.Server
 ```
 
+---
+
+## 🐳 Ejecución con Docker
+
+Para facilitar el despliegue, el proyecto incluye configuración de Docker para ejecutar el servidor y la base de datos MySQL en contenedores.
+
+### Prerrequisitos
+
+* **Docker** y **Docker Compose** instalados en tu sistema.
+
+### Pasos para ejecutar con Docker
+
+1. **Asegúrate de tener Docker Compose:**
+   ```bash
+   docker --version
+   docker-compose --version
+   ```
+
+2. **Construye y ejecuta los contenedores:**
+   ```bash
+   docker-compose up --build
+   ```
+
+   Esto iniciará:
+   - Un contenedor MySQL con la base de datos `chatdb` y la tabla `users` creada automáticamente.
+   - Un contenedor con el servidor Java escuchando en el puerto 2558.
+
+3. **Accede al servidor:**
+   - El servidor estará disponible en `localhost:2558`.
+   - La base de datos MySQL en `localhost:3307` (usuario: `chatuser`, contraseña: `chatpass`).
+
+4. **Detener los contenedores:**
+   ```bash
+   docker-compose down
+   ```
+
+### Notas sobre Docker
+
+* La base de datos persiste en un volumen Docker llamado `mysql_data`.
+* Si necesitas cambiar las credenciales de la base de datos, edita el archivo `docker-compose.yml`.
+* El servidor se conecta automáticamente a la base de datos MySQL en el contenedor.
+
+---
+
+## 🚀 Deployment con GitHub Actions
+
+El proyecto incluye un workflow de GitHub Actions para deployment automático al servidor.
+
+### Configuración del Servidor
+
+1. **Instala Docker y Docker Compose en el servidor.**
+
+2. **Clona el repositorio en el servidor:**
+   ```bash
+   git clone https://github.com/DiegoVanegas03/computo-nube-servidor.git /path/to/your/project
+   cd /path/to/your/project
+   ```
+
+3. **Configura Nginx como proxy reverso:**
+   Crea un archivo de configuración en `/etc/nginx/sites-available/chat-server`:
+   ```nginx
+   server {
+       listen 80;
+       server_name your-domain.com;
+
+       location / {
+           proxy_pass http://localhost:2558;
+           proxy_set_header Host $host;
+           proxy_set_header X-Real-IP $remote_addr;
+           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+           proxy_set_header X-Forwarded-Proto $scheme;
+       }
+   }
+   ```
+   Habilita el sitio: `sudo ln -s /etc/nginx/sites-available/chat-server /etc/nginx/sites-enabled/`
+
+4. **Ejecuta el script de deployment inicial:**
+   ```bash
+   ./deploy.sh
+   ```
+
+### Configuración de GitHub Secrets
+
+En tu repositorio de GitHub, ve a Settings > Secrets and variables > Actions y agrega estos secrets:
+
+* `SERVER_HOST`: IP o dominio de tu servidor.
+* `SERVER_USER`: Usuario SSH para conectarte al servidor.
+* `SERVER_SSH_KEY`: Clave privada SSH para autenticación (genera con `ssh-keygen` y agrega la pública a `~/.ssh/authorized_keys` en el servidor).
+
+### Cómo funciona el Deployment
+
+* Al hacer push a la rama `main`, el workflow:
+  1. Construye la imagen Docker.
+  2. La sube a GitHub Container Registry.
+  3. Se conecta por SSH al servidor.
+  4. Ejecuta `git pull` y `docker-compose up -d` para actualizar y reiniciar los servicios.
+
+* Nginx actúa como proxy reverso, redirigiendo las peticiones al puerto 2558 del contenedor.
+
+---
+
 ### Estructura del proyecto:
+```
+computo-nube-servidor/
+├── .github/
+│   └── workflows/
+│       └── deploy.yml      # Workflow de GitHub Actions para deployment
+├── src/
+│   ├── server/           # Lógica del servidor y conexiones
+│   ├── repositories/     # Acceso a datos (UserRepository)
+│   ├── sql/             # Configuración de base de datos
+│   └── util/            # Utilidades (EnvLoader)
+├── lib/                 # Librerías JAR necesarias
+├── build/               # Archivos compilados (.class)
+├── .env.example         # Plantilla de configuración
+├── .env                 # Tu configuración (ignorado por git)
+├── Dockerfile           # Configuración para construir la imagen Docker del servidor
+├── docker-compose.yml   # Configuración para ejecutar contenedores con Docker Compose
+├── init.sql             # Script de inicialización de la base de datos
+├── deploy.sh            # Script de deployment para el servidor
+└── README.md
+```
 ```
 computo-nube-servidor/
 ├── src/
@@ -192,6 +313,9 @@ computo-nube-servidor/
 ├── build/               # Archivos compilados (.class)
 ├── .env.example         # Plantilla de configuración
 ├── .env                 # Tu configuración (ignorado por git)
+├── Dockerfile           # Configuración para construir la imagen Docker del servidor
+├── docker-compose.yml   # Configuración para ejecutar contenedores con Docker Compose
+├── init.sql             # Script de inicialización de la base de datos
 └── README.md
 ```
 

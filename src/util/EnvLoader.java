@@ -20,6 +20,10 @@ public class EnvLoader {
     }
 
     public static String get(String key) {
+        String envValue = System.getenv(key);
+        if (envValue != null && !envValue.isEmpty()) {
+            return envValue;
+        }
         return getEnv().getProperty(key);
     }
 }

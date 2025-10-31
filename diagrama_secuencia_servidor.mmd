@@ -1,0 +1,67 @@
+sequenceDiagram
+    participant Cliente
+    participant Server
+    participant MultiClientHandler
+    participant UserRepository
+    participant Connection
+
+    %% Inicio del servidor
+    Server->>Server: main() - Crear ServerSocket en puerto 2558
+    Server->>Server: Escuchar conexiones entrantes
+
+    %% Conexión de cliente
+    Cliente->>Server: Conectar (Socket TCP)
+    Server->>Server: accept() - Aceptar conexión
+    Server->>MultiClientHandler: new MultiClientHandler(socket)
+    Server->>MultiClientHandler: start() - Iniciar hilo
+
+    %% Autenticación
+    MultiClientHandler->>Cliente: Esperar mensaje de autenticación (JSON)
+    Cliente->>MultiClientHandler: Enviar {"username": "...", "password": "..."}
+    MultiClientHandler->>UserRepository: CheckCredentials(username, password)
+    UserRepository-->>MultiClientHandler: boolean isAuthenticated
+    alt Autenticacion exitosa
+        MultiClientHandler->>MultiClientHandler: authenticatedUsername = username
+    else Autenticacion fallida
+        MultiClientHandler->>Cliente: Enviar mensaje de error
+        MultiClientHandler->>Cliente: Cerrar socket
+        MultiClientHandler->>MultiClientHandler: Terminar hilo
+    end
+
+    %% Enviar lista de salas
+    MultiClientHandler->>MultiClientHandler: Leer archivos en src/levels/
+    MultiClientHandler->>Cliente: Enviar {"action": "room_list", "rooms": [...]}
+
+    %% Selección de sala
+    MultiClientHandler->>Cliente: Esperar selección de sala
+    Cliente->>MultiClientHandler: Enviar {"action": "join_room", "room": "levelXX.txt"}
+    MultiClientHandler->>MultiClientHandler: Validar sala existe
+    MultiClientHandler->>MultiClientHandler: Leer archivo de sala
+    MultiClientHandler->>Cliente: Enviar {"action": "room_info", "lvn": "...", "vh": ..., "gv": ..., "mapa": "..."}
+
+    %% Crear conexión
+    MultiClientHandler->>Connection: new Connection(socket, username, room)
+    MultiClientHandler->>Connection: start()
+    Connection->>Connection: Agregar a activeConnections
+    Connection->>Connection: Iniciar readerThread y writerThread
+
+    %% Mensajes de bienvenida
+    MultiClientHandler->>Connection: sendMessage(bienvenida)
+    MultiClientHandler->>Connection: sendMessage(usuarios conectados)
+
+    %% Bucle de mensajes
+    loop Mientras conexion activa
+        Connection->>Cliente: readerThread lee mensajes
+        Cliente->>Connection: Enviar mensaje JSON
+        alt Mensaje de salida
+            Connection->>Connection: broadcastServerMessage(desconexion)
+            Connection->>Connection: close()
+        else Otro mensaje
+            Connection->>Connection: broadcastMessage(mensaje, sender)
+        end
+        Connection->>Cliente: writerThread envía mensajes de otros
+    end
+
+    %% Desconexión
+    Cliente->>Connection: Cerrar conexión o error
+    Connection->>Connection: close() - Remover de activeConnections, cerrar threads y socket
