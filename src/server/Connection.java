@@ -25,6 +25,7 @@ public class Connection {
     private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
     private static final List<Connection> activeConnections = Collections.synchronizedList(new ArrayList<>());
     private boolean notifiedDisconnect = false;
+    private int timeoutCount = 0;
     
     public Connection(Socket socket, String username, String room) throws IOException {
         this.socket = socket;
@@ -34,8 +35,8 @@ public class Connection {
         this.dos = new DataOutputStream(socket.getOutputStream());
         this.isActive = true;
         
-        // Establecer timeout de 5 segundos para detectar desconexiones
-        this.socket.setSoTimeout(5000);
+        // Establecer timeout de 1 segundo para detectar desconexiones
+        this.socket.setSoTimeout(1000);
         
         System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username + " Sala: " + room);
     }
@@ -50,9 +51,11 @@ public class Connection {
     }
     
     private void readMessages() {
-        try {
-            String message;
-            while (isActive && (message = dis.readUTF()) != null) {
+        while (isActive) {
+            try {
+                String message = dis.readUTF();
+                if (message == null) break;
+                
                 // Verificar si es JSON válido
                 JSONObject messageJson;
                 try {
@@ -75,18 +78,26 @@ public class Connection {
                     break;
                 }
                 broadcastMessage(message, this);
-            }
-        } catch (IOException e) {
-            if (isActive) {
+                timeoutCount = 0; // Resetear contador de timeout al recibir mensaje
+            } catch (IOException e) {
+                if (!isActive) break;
                 if (e instanceof java.net.SocketTimeoutException) {
-                    // Timeout, continuar esperando
-                    return;
+                    // Timeout, incrementar contador
+                    timeoutCount++;
+                    if (timeoutCount > 10) {
+                        System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") inactivo por mucho tiempo, desconectando");
+                        close();
+                        break;
+                    } else {
+                        continue;
+                    }
                 } else {
                     // Desconexión real
                     System.out.println("Error leyendo mensaje del cliente " + socket.getInetAddress() + " (" + username + "): " + e.getMessage());
+                    close();
+                    break;
                 }
             }
-            close();
         }
     }
     
