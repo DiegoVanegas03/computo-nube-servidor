@@ -24,6 +24,7 @@ public class Connection {
     private volatile boolean isActive;
     private final BlockingQueue<String> messageQueue = new LinkedBlockingQueue<>();
     private static final List<Connection> activeConnections = Collections.synchronizedList(new ArrayList<>());
+    private boolean notifiedDisconnect = false;
     
     public Connection(Socket socket, String username, String room) throws IOException {
         this.socket = socket;
@@ -32,6 +33,9 @@ public class Connection {
         this.dis = new DataInputStream(socket.getInputStream());
         this.dos = new DataOutputStream(socket.getOutputStream());
         this.isActive = true;
+        
+        // Establecer timeout de 5 segundos para detectar desconexiones
+        this.socket.setSoTimeout(5000);
         
         System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username + " Sala: " + room);
     }
@@ -65,6 +69,7 @@ public class Connection {
                 // Verificar si es comando de salida
                 if ("exit".equals(messageJson.getString("action"))) {
                     System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") solicita desconexión");
+                    notifiedDisconnect = true;
                     broadcastServerMessage(createServerMessage("Se desconecto el cliente (" + username + ")"), this);
                     close();
                     break;
@@ -73,7 +78,13 @@ public class Connection {
             }
         } catch (IOException e) {
             if (isActive) {
-                System.out.println("Error leyendo mensaje del cliente " + socket.getInetAddress() + " (" + username + "): " + e.getMessage());
+                if (e instanceof java.net.SocketTimeoutException) {
+                    // Timeout, continuar esperando
+                    return;
+                } else {
+                    // Desconexión real
+                    System.out.println("Error leyendo mensaje del cliente " + socket.getInetAddress() + " (" + username + "): " + e.getMessage());
+                }
             }
             close();
         }
@@ -162,6 +173,11 @@ public class Connection {
         if (!isActive) return;
         isActive = false;
         try {
+            if (!notifiedDisconnect) {
+                broadcastServerMessage(createServerMessage("Se desconecto el cliente (" + username + ")"), this);
+                notifiedDisconnect = true;
+            }
+            
             activeConnections.remove(this);
             
             // Agregar mensaje especial para despertar el hilo de escritura
