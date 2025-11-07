@@ -76,7 +76,7 @@ public class Connection {
                 if ("exit".equals(messageJson.getString("action"))) {
                     System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") solicita desconexión");
                     notifiedDisconnect = true;
-                    broadcastServerMessage(createServerMessage("Se desconecto el cliente (" + username + ")"), this);
+                    broadcastServerMessage(createDisconnectMessage(username), this);
                     close();
                     break;
                 }
@@ -141,6 +141,16 @@ public class Connection {
         return serverMessage.toString();
     }
 
+    public String createDisconnectMessage(String nickname) {
+        JSONObject serverMessage = new JSONObject();
+        serverMessage.put("user", "server");
+        JSONObject info = new JSONObject();
+        info.put("action", "remove_user");
+        info.put("nickname", nickname);
+        serverMessage.put("info", info);
+        return serverMessage.toString();
+    }
+
     public void broadcastServerMessage(String message,Connection sender) {
         synchronized (activeConnections) {
             for (Connection connection : activeConnections) {
@@ -188,7 +198,7 @@ public class Connection {
         isActive = false;
         try {
             if (!notifiedDisconnect) {
-                broadcastServerMessage(createServerMessage("Se desconecto el cliente (" + username + ")"), this);
+                broadcastServerMessage(createDisconnectMessage(username), this);
                 notifiedDisconnect = true;
             }
             
