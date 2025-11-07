@@ -26,6 +26,9 @@ public class Connection {
     private static final List<Connection> activeConnections = Collections.synchronizedList(new ArrayList<>());
     private boolean notifiedDisconnect = false;
     private int timeoutCount = 0;
+    // Configuración de timeouts
+    private static final int SOCKET_TIMEOUT_MS = 30000; // 30 segundos
+    private static final int MAX_TIMEOUT_COUNT = 30; // 30 intentos = 15 minutos de inactividad
     
     public Connection(Socket socket, String username, String room) throws IOException {
         this.socket = socket;
@@ -35,8 +38,8 @@ public class Connection {
         this.dos = new DataOutputStream(socket.getOutputStream());
         this.isActive = true;
         
-        // Establecer timeout de 1 segundo para detectar desconexiones
-        this.socket.setSoTimeout(1000);
+        // Establecer timeout para detectar desconexiones
+        this.socket.setSoTimeout(SOCKET_TIMEOUT_MS);
         
         System.out.println("Nueva conexión establecida desde: " + socket.getInetAddress() + " Usuario: " + username + " Sala: " + room);
     }
@@ -84,7 +87,7 @@ public class Connection {
                 if (e instanceof java.net.SocketTimeoutException) {
                     // Timeout, incrementar contador
                     timeoutCount++;
-                    if (timeoutCount > 10) {
+                    if (timeoutCount > MAX_TIMEOUT_COUNT) {
                         System.out.println("Cliente " + socket.getInetAddress() + " (" + username + ") inactivo por mucho tiempo, desconectando");
                         close();
                         break;
