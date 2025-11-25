@@ -9,6 +9,11 @@ import org.java_websocket.server.WebSocketServer;
 
 import java.io.File;
 import java.net.InetSocketAddress;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
@@ -177,9 +182,26 @@ public class GameWebSocketServer extends WebSocketServer {
     }
 
     private boolean authenticateUser(String username, String password) {
-        // Autenticación simple de ejemplo
-        // En producción: verificar contra base de datos con hash bcrypt
-        return username.length() >= 3 && password.length() >= 4;
+        String dbHost = System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "localhost";
+        String dbPort = System.getenv("DB_PORT") != null ? System.getenv("DB_PORT") : "3306";
+        String dbName = System.getenv("DB_NAME") != null ? System.getenv("DB_NAME") : "chatdb";
+        String dbUser = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "chatuser";
+        String dbPassword = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "chatpass";
+
+        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName + "?useSSL=false&allowPublicKeyRetrieval=true";
+
+        try (Connection conn = DriverManager.getConnection(url, dbUser, dbPassword);
+             PreparedStatement stmt = conn.prepareStatement("SELECT password FROM users WHERE username = ?")) {
+            stmt.setString(1, username);
+            ResultSet rs = stmt.executeQuery();
+            if (rs.next()) {
+                String storedPassword = rs.getString("password");
+                return storedPassword.equals(password); // En producción, usar hash como bcrypt
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     private void handleJoinRoom(WebSocket conn, JsonObject data) {
