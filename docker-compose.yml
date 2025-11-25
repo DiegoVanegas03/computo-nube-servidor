@@ -31,7 +31,7 @@ services:
     ports:
       - "2558:2558"
     volumes:
-      - ./src/levels:/app/src/levels
+      - ./maps:/app/maps
 
 volumes:
   mysql_data:

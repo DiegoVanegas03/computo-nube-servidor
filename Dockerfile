@@ -1,21 +1,13 @@
-FROM eclipse-temurin:11-jdk-jammy
+FROM maven:3.9.4-eclipse-temurin-17
 
 WORKDIR /app
 
-# Copiar librerías
-COPY lib/ lib/
+COPY pom.xml .
+COPY src ./src
+COPY maps ./maps
 
-# Copiar código fuente
-COPY src/ src/
+RUN mvn clean compile
 
-# Crear directorio build
-RUN mkdir build
-
-# Compilar
-RUN javac -cp "lib/mysql-connector-j-9.4.0.jar:lib/json-20240303.jar" -d build $(find src -name '*.java')
-
-# Exponer puerto
 EXPOSE 2558
 
-# Comando para ejecutar
-CMD ["java", "-cp", "lib/mysql-connector-j-9.4.0.jar:lib/json-20240303.jar:build", "server.Server"]
+CMD ["mvn", "exec:java"]
