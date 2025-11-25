@@ -5,7 +5,7 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 -- Insertar usuario de prueba
-INSERT INTO users (username, password) VALUES ('admin', 'admin123') ON DUPLICATE KEY UPDATE password=password;
+INSERT INTO users (username, password) VALUES ('admin', 'admin') ON DUPLICATE KEY UPDATE password=password;
 
 INSERT INTO users (username, password) VALUES 
 ('360526', '360526'),
