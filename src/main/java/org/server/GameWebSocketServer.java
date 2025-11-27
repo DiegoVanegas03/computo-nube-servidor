@@ -329,6 +329,18 @@ public class GameWebSocketServer extends WebSocketServer {
                     room.id,
                     createMessage("restartGame", Map.of())
             );
+            
+            // Enviar actualización inmediata con las nuevas posiciones
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", room.getPlayersData());
+            updateData.put("platforms", room.getPlatformsData());
+            updateData.put("requiresKey", room.key != null);
+            updateData.put("doorOpen", room.doorOpen);
+            if (room.getKeyData() != null) {
+                updateData.put("key", room.getKeyData());
+            }
+            broadcastToRoom(room.id, createMessage("gameUpdate", updateData));
+            
             room.canUpdate = true;
         }, 3, TimeUnit.SECONDS);
     }
