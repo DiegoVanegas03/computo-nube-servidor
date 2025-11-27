@@ -183,7 +183,7 @@ public class GameWebSocketServer extends WebSocketServer {
 
     private boolean authenticateUser(String username, String password) {
         String dbHost = System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "localhost";
-        String dbPort = System.getenv("DB_PORT") != null ? System.getenv("DB_PORT") : "3307";
+        String dbPort = System.getenv("DB_PORT") != null ? System.getenv("DB_PORT") : "3306";
         String dbName = System.getenv("DB_NAME") != null ? System.getenv("DB_NAME") : "chatdb";
         String dbUser = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "chatuser";
         String dbPassword = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "chatpass";
