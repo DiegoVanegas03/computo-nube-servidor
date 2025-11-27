@@ -21,6 +21,9 @@ public class GameRoom {
     public Map<String, Player> players = new ConcurrentHashMap<>();
     public Map<String, Platform> platforms = new ConcurrentHashMap<>(); // Plataformas móviles como entidades
 
+    public Key key = null; // Llave del nivel (puede ser null si no hay)
+    public boolean doorOpen = false; // Estado de la puerta (true = abierta)
+
     public int completedPlayers = 0;
 
     public int needUsers;
@@ -34,6 +37,20 @@ public class GameRoom {
         this.waitingRoom = waitingRoom;
         this.needUsers = needUsers;
         // Las plataformas se inicializarán cuando el juego comience realmente
+    }
+
+    public void initializeKey() {
+        // Escanear el mapa para encontrar la llave (tile 50)
+        for (int y = 0; y < gameWorld.length; y++) {
+            for (int x = 0; x < gameWorld[y].length; x++) {
+                if (gameWorld[y][x] == 50) { // Tile de llave
+                    this.key = new Key(x * GameWebSocketServer.SIZE_TILE, y * GameWebSocketServer.SIZE_TILE);
+                    System.out.println("[Llave] Encontrada en X=" + (x * GameWebSocketServer.SIZE_TILE) + ", Y=" + (y * GameWebSocketServer.SIZE_TILE));
+                    return; // Solo una llave por nivel
+                }
+            }
+        }
+        System.out.println("[Llave] No se encontró llave en este nivel");
     }
 
     public void initializePlatforms() {
@@ -125,6 +142,13 @@ public class GameRoom {
             data.add(platform.toMap());
         }
         return data;
+    }
+
+    Map<String, Object> getKeyData() {
+        if (key == null) {
+            return null;
+        }
+        return key.toMap();
     }
 
     /**
@@ -246,15 +270,15 @@ public class GameRoom {
 
         // Actualizar plataformas basadas en el número de jugadores
         for (Platform platform : platforms.values()) {
-            int playersOnPlatform = platformPlayerCount.getOrDefault(platform.id, 0);
+            int playersOnPlatform = platformPlayerCount.get(platform.id);
             platform.playersOnPlatform = playersOnPlatform;
 
-            System.out.println("[Plataforma " + platform.id + "] Jugadores: " + playersOnPlatform + "/" + platform.requiredPlayers + ", moving: " + platform.isMoving);
+            //System.out.println("[Plataforma " + platform.id + "] Jugadores: " + playersOnPlatform + "/" + platform.requiredPlayers + ", moving: " + platform.isMoving);
 
             // Si NO hay suficientes jugadores Y la plataforma NO está en movimiento, resetear
             if (playersOnPlatform < platform.requiredPlayers && !platform.isMoving) {
                 if (platform.y != platform.originalY) {
-                    System.out.println("[Plataforma] " + platform.id + " reseteando a posición original");
+                    //System.out.println("[Plataforma] " + platform.id + " reseteando a posición original");
                     platform.resetToOriginal();
                 }
                 platform.detectedPlayersTime = 0;
@@ -280,7 +304,7 @@ public class GameRoom {
                     float destY = platform.y;
                     boolean foundDest = false;
 
-                    System.out.println("[Plataforma] Buscando destino desde Y=" + platformTileY + ", X=" + platformTileX + "-" + (platformTileX + platformTileWidth));
+                    //System.out.println("[Plataforma] Buscando destino desde Y=" + platformTileY + ", X=" + platformTileX + "-" + (platformTileX + platformTileWidth));
 
                     // Buscar destino ARRIBA
                     for (int checkY = platformTileY - 1; checkY >= 0 && !foundDest; checkY--) {
@@ -297,7 +321,7 @@ public class GameRoom {
                             direction = -1;
                             destY = checkY * GameWebSocketServer.SIZE_TILE;
                             foundDest = true;
-                            System.out.println("[Plataforma] Destino encontrado ARRIBA en Y=" + checkY);
+                            //System.out.println("[Plataforma] Destino encontrado ARRIBA en Y=" + checkY);
                         }
                     }
                     
@@ -317,17 +341,17 @@ public class GameRoom {
                                 direction = 1;
                                 destY = checkY * GameWebSocketServer.SIZE_TILE;
                                 foundDest = true;
-                                System.out.println("[Plataforma] Destino encontrado ABAJO en Y=" + checkY);
+                                //System.out.println("[Plataforma] Destino encontrado ABAJO en Y=" + checkY);
                             }
                         }
                     }
 
                     if (direction != 0) {
-                        System.out.println("[Plataforma] " + platform.id + " ¡¡MOVIMIENTO!! hacia Y=" + destY);
+                        //System.out.println("[Plataforma] " + platform.id + " ¡¡MOVIMIENTO!! hacia Y=" + destY);
                         platform.startMovement(direction, destY);
                         platform.detectedPlayersTime = 0; // Reset para siguiente movimiento
                     } else {
-                        System.out.println("[Plataforma] NO se encontró destino para " + platform.id);
+                        //System.out.println("[Plataforma] NO se encontró destino para " + platform.id);
                     }
                 }
             } else if (playersOnPlatform < platform.requiredPlayers) {

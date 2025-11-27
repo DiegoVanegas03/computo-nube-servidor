@@ -24,6 +24,9 @@ public class Player {
     // Lista de jugadores que están encima de este jugador
     Set<String> playersOnTop = new HashSet<>();
 
+    // Sistema de llaves
+    boolean hasKey = false;
+
     Player(String id, String username) {
         this.id = id;
         this.username = username;
@@ -37,6 +40,7 @@ public class Player {
         data.put("x", x);
         data.put("y", y);
         data.put("isVisible", isVisible);
+        data.put("hasKey", hasKey);
         return data;
     }
 }
