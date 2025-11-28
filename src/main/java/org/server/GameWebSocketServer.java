@@ -34,8 +34,8 @@ public class GameWebSocketServer extends WebSocketServer {
     private static final float GRAVITY = 0.5f;
     private static final float JUMP_FORCE = -10f;
 
-    private static final float MOVE_SPEED = 2.2f;
-    private static final int GAME_TICK_RATE = 120;
+    private static final float MOVE_SPEED = 4.5f;
+    private static final int GAME_TICK_RATE = 60;
     
     private static final int ORIGINAL_SIZE_TILE = 16;
     private static final int SCALE = 3;
