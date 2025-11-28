@@ -1,24 +1,27 @@
 package org.server;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
-import org.java_websocket.WebSocket;
-import org.java_websocket.handshake.ClientHandshake;
-import org.java_websocket.server.WebSocketServer;
-
 import java.io.File;
 import java.net.InetSocketAddress;
-import java.sql.Connection;
-import java.sql.DriverManager;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.Timer;
+import java.util.TimerTask;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+
+import org.java_websocket.WebSocket;
+import org.java_websocket.handshake.ClientHandshake;
+import org.java_websocket.server.WebSocketServer;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 public class GameWebSocketServer extends WebSocketServer {
 
@@ -32,8 +35,8 @@ public class GameWebSocketServer extends WebSocketServer {
     private static final float JUMP_FORCE = -10f;
 
     private static final float MOVE_SPEED = 4.5f;
-    private static final int GAME_TICK_RATE = 60; // 60 FPS
-
+    private static final int GAME_TICK_RATE = 120;
+    
     private static final int ORIGINAL_SIZE_TILE = 16;
     private static final int SCALE = 3;
     public static final int SIZE_TILE = ORIGINAL_SIZE_TILE * SCALE; // 48 pixels
@@ -182,26 +185,8 @@ public class GameWebSocketServer extends WebSocketServer {
     }
 
     private boolean authenticateUser(String username, String password) {
-        String dbHost = System.getenv("DB_HOST") != null ? System.getenv("DB_HOST") : "localhost";
-        String dbPort = System.getenv("DB_PORT") != null ? System.getenv("DB_PORT") : "3306";
-        String dbName = System.getenv("DB_NAME") != null ? System.getenv("DB_NAME") : "chatdb";
-        String dbUser = System.getenv("DB_USER") != null ? System.getenv("DB_USER") : "chatuser";
-        String dbPassword = System.getenv("DB_PASSWORD") != null ? System.getenv("DB_PASSWORD") : "chatpass";
-
-        String url = "jdbc:mysql://" + dbHost + ":" + dbPort + "/" + dbName + "?useSSL=false&allowPublicKeyRetrieval=true";
-
-        try (Connection conn = DriverManager.getConnection(url, dbUser, dbPassword);
-             PreparedStatement stmt = conn.prepareStatement("SELECT password FROM users WHERE username = ?")) {
-            stmt.setString(1, username);
-            ResultSet rs = stmt.executeQuery();
-            if (rs.next()) {
-                String storedPassword = rs.getString("password");
-                return storedPassword.equals(password); // En producción, usar hash como bcrypt
-            }
-        } catch (SQLException e) {
-            e.printStackTrace();
-        }
-        return false;
+        // Autenticación hardcoded para pruebas (sin DB)
+        return true;
     }
 
     private void handleJoinRoom(WebSocket conn, JsonObject data) {
