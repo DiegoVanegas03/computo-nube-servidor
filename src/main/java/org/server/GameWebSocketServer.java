@@ -509,7 +509,8 @@ public class GameWebSocketServer extends WebSocketServer {
             for (Player player : room.players.values()) {
                 if (!player.playersOnTop.isEmpty()) {
                     // Calcular cuánto se movió realmente este jugador (delta real, no intención)
-                    float deltaX = player.x - previousX.get(player.id);
+                    Float prevX = previousX.get(player.id);
+                    float deltaX = (prevX != null) ? player.x - prevX : 0;
                     
                     // Este jugador tiene gente encima, moverlos
                     for (String playerOnTopId : player.playersOnTop) {
