@@ -1,0 +1,13 @@
+%% Diagrama de Estados del Proceso de Juego
+stateDiagram-v2
+    [*] --> EsperandoConexiones
+    EsperandoConexiones --> Autenticado: auth
+    Autenticado --> EsperandoSala: joinRoom
+    EsperandoSala --> SalaLlena: suficientes jugadores
+    SalaLlena --> JuegoIniciado: startGame
+    JuegoIniciado --> Jugando: gameLoop
+    Jugando --> Victoria: todos completaron meta
+    Jugando --> Reinicio: restartGame
+    Victoria --> [*]
+    Reinicio --> EsperandoSala
+    Jugando --> EsperandoSala: leaveRoom

@@ -1,0 +1,59 @@
+%% Diagrama de Arquitectura Profesional
+flowchart TD
+    subgraph VPS["VPS (Servidor físico/virtual)"]
+        subgraph ProxyWS["WebSocket Proxy (Nginx, puerto 2558)"]
+        end
+
+        subgraph DockerInfra["Docker / Docker Compose"]
+            subgraph ServidorJava["Contenedor: Servidor Java"]
+                MainJava[Main.java]
+                GameWebSocketServer
+                GameRoom
+                Player
+                Platform
+                Key
+                User
+                RoomConfig
+                Maps[Maps/*.json]
+            end
+
+            subgraph MySQLContainer["Contenedor: MySQL"]
+                UsersTable[(Tabla users)]
+                InitSQL[init.sql]
+            end
+        end
+    end
+
+    ClienteApp[GameWebSocketClient Java/Swing]
+
+    %% Flujos principales
+    ClienteApp -- ws:ip/ws --> ProxyWS
+    ProxyWS -- ProxyPass --> GameWebSocketServer
+    GameWebSocketServer -- Maneja salas --> GameRoom
+    GameRoom -- Contiene --> Player
+    GameRoom -- Contiene --> Platform
+    GameRoom -- Puede tener --> Key
+    GameWebSocketServer -- Autenticación --> User
+    GameWebSocketServer -- Configuración de sala --> RoomConfig
+    GameWebSocketServer -- Lee mapas --> Maps
+    GameWebSocketServer -- Acceso DB:3306 --> UsersTable
+    MySQLContainer -- Inicializa con --> InitSQL
+
+    %% Infraestructura
+    DockerInfra -- Orquesta --> ServidorJava
+    DockerInfra -- Orquesta --> MySQLContainer
+
+    %% Agrupaciones visuales y colores variados
+    classDef cliente fill:#b3e5fc,stroke:#0288d1,stroke-width:2px;
+    classDef proxy fill:#ffe082,stroke:#fbc02d,stroke-width:2px;
+    classDef servidor fill:#ffe0b2,stroke:#e65100,stroke-width:2px;
+    classDef db fill:#c8e6c9,stroke:#388e3c,stroke-width:2px;
+    classDef infra fill:#d1c4e9,stroke:#6a1b9a,stroke-width:2px;
+    classDef vps fill:#f8bbd0,stroke:#ad1457,stroke-width:2px;
+
+    class ClienteApp cliente;
+    class ProxyWS,ProxyConfig proxy;
+    class MainJava,GameWebSocketServer,GameRoom,Player,Platform,Key,User,RoomConfig,Maps servidor;
+    class UsersTable,InitSQL db;
+    class DockerInfra,ServidorJava,MySQLContainer infra;
+    class VPS vps;

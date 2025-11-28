@@ -1,0 +1,137 @@
+classDiagram
+direction LR
+    %% Definición de relaciones
+    GameWebSocketServer --> GameRoom : gestiona
+    GameWebSocketServer --> User : usuarios conectados
+    GameRoom --> Player : jugadores
+    GameRoom --> Platform : plataformas
+    GameRoom --> Key : llave
+    GameRoom --> RoomConfig : configuración
+    Player --> Key : puede tener llave
+    Platform --> Player : jugadores sobre plataforma
+    Key --> Player : llevada por jugador
+
+    %% Definición de clases
+    class GameWebSocketServer {
+        +gson : Gson
+        +users : Map<String, User>
+        +rooms : Map<String, GameRoom>
+        +connectionToUserId : Map<WebSocket, String>
+        +scheduler : ScheduledExecutorService
+        start()
+        onOpen()
+        onClose()
+        onMessage()
+        onError()
+        startGameLoop()
+        updateGame()
+        handleAuth()
+        handleJoinRoom()
+        handleLeaveRoom()
+        handleMove()
+        handleJump()
+        handleChat()
+        checkWinnerTiles()
+        handleKeySystem()
+    }
+    class User {
+        +id : String
+        +username : String
+        +connection : WebSocket
+        +currentRoom : String
+    }
+    class GameRoom {
+        +canUpdate : boolean
+        +gameStarted : boolean
+        +id : String
+        +name : String
+        +world : int[][]
+        +gameWorld : int[][]
+        +waitingRoom : int[][]
+        +players : Map<String, Player>
+        +platforms : Map<String, Platform>
+        +key : Key
+        +doorOpen : boolean
+        +completedPlayers : int
+        +needUsers : int
+        addPlayer()
+        removePlayer()
+        getPlayer()
+        getPlayersData()
+        getPlatformsData()
+        getKeyData()
+        initializeKey()
+        initializePlatforms()
+        updatePlatformPositions()
+        updatePlatformLogic()
+    }
+    class Player {
+        +id : String
+        +username : String
+        +x : float
+        +y : float
+        +velocityY : float
+        +direction : String
+        +moveDirection : int
+        +isOnGround : boolean
+        +isVisible : boolean
+        +width : float
+        +height : float
+        +playersOnTop : Set<String>
+        +hasKey : boolean
+        toMap()
+    }
+    class Platform {
+        +id : String
+        +x : float
+        +y : float
+        +width : float
+        +height : float
+        +type : int
+        +direction : int
+        +requiredPlayers : int
+        +playersOnPlatform : int
+        +destY : float
+        +isMoving : boolean
+        +startMoveTime : long
+        +detectedPlayersTime : long
+        +originalX : float
+        +originalY : float
+        +isAtOrigin : boolean
+        startMovement()
+        updatePosition()
+        resetToOriginal()
+        getPlayersNeeded()
+        toMap()
+    }
+    class Key {
+        +x : float
+        +y : float
+        +isCollected : boolean
+        +carriedByPlayerId : String
+        +floatOffset : float
+        +lastFloatUpdate : long
+        +targetX : float
+        +targetY : float
+        +isMovingToTarget : boolean
+        +transferStartTime : long
+        +isOpeningDoor : boolean
+        +doorOpenStartTime : long
+        checkCollision()
+        checkPlayerSteal()
+        updatePosition()
+        updateFloatAnimation()
+        checkDoorCollision()
+        toMap()
+    }
+    class RoomConfig {
+        +roomName : String
+        +usersToStart : int
+        +waitingRoom : int[][]
+        +world : int[][]
+        getRoomName()
+        getUsersToStart()
+        getWaitingRoom()
+        getWorld()
+    }
+```

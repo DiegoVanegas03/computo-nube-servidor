@@ -545,10 +545,10 @@ public class GameWebSocketServer extends WebSocketServer {
             // Enviar actualización a todos los jugadores en la sala
             Map<String, Object> updateData = new HashMap<>();
             updateData.put("players", room.getPlayersData());
-            updateData.put("platforms", room.getPlatformsData());
-            updateData.put("requiresKey", room.key != null);
+            updateData.put("platforms", room.gameStarted ? room.getPlatformsData() : new ArrayList<>());
+            updateData.put("requiresKey", room.key != null && room.gameStarted);
             updateData.put("doorOpen", room.doorOpen);
-            if (room.getKeyData() != null) {
+            if (room.getKeyData() != null && room.gameStarted) {
                 updateData.put("key", room.getKeyData());
             }
             broadcastToRoom(room.id, createMessage("gameUpdate", updateData));
