@@ -83,7 +83,13 @@ public class GameWebSocketServer extends WebSocketServer {
             System.out.println("Recarga en cooldown, omitiendo.");
             return;
         }
-        // Limpiar salas existentes (solo si no están en uso, por simplicidad)
+        // Verificar si hay salas con jugadores activos
+        boolean hasActivePlayers = rooms.values().stream().anyMatch(room -> !room.players.isEmpty());
+        if (hasActivePlayers) {
+            System.out.println("Hay salas con jugadores activos, recarga omitida para evitar desconexiones.");
+            return;
+        }
+        // Limpiar salas existentes solo si no hay jugadores
         rooms.clear();
         initializeRooms();
         lastReloadTime = currentTime;
@@ -186,9 +192,6 @@ public class GameWebSocketServer extends WebSocketServer {
 
         // Autenticación simple (en producción usar hash y base de datos)
         if (authenticateUser(username, password)) {
-            // Recargar mapas automáticamente al autenticar
-            reloadRooms();
-
             String userId = UUID.randomUUID().toString();
             User user = new User(userId, username, conn);
             users.put(userId, user);
@@ -427,7 +430,7 @@ public class GameWebSocketServer extends WebSocketServer {
             return;
         }
 
-        // Recargar mapas automáticamente al solicitar la lista
+        // Recargar mapas automáticamente al solicitar la lista, solo si no hay jugadores activos
         reloadRooms();
 
         sendToClient(conn, createMessage("roomsList", Map.of("rooms", getRoomsList())));
