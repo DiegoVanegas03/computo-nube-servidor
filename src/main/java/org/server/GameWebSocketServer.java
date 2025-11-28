@@ -31,6 +31,9 @@ public class GameWebSocketServer extends WebSocketServer {
     private final Map<WebSocket, String> connectionToUserId = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newSingleThreadScheduledExecutor();
 
+    private long lastReloadTime = 0;
+    private static final long RELOAD_COOLDOWN_MS = 10000; // 10 segundos
+
     private static final float GRAVITY = 0.5f;
     private static final float JUMP_FORCE = -10f;
 
@@ -74,6 +77,19 @@ public class GameWebSocketServer extends WebSocketServer {
         }
     }
 
+    private void reloadRooms() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastReloadTime < RELOAD_COOLDOWN_MS) {
+            System.out.println("Recarga en cooldown, omitiendo.");
+            return;
+        }
+        // Limpiar salas existentes (solo si no están en uso, por simplicidad)
+        rooms.clear();
+        initializeRooms();
+        lastReloadTime = currentTime;
+        System.out.println("Mapas recargados. Salas disponibles: " + rooms.size());
+    }
+
     @Override
     public void onOpen(WebSocket conn, ClientHandshake handshake) {
         System.out.println("Nueva conexión: " + conn.getRemoteSocketAddress());
@@ -114,6 +130,9 @@ public class GameWebSocketServer extends WebSocketServer {
                     break;
                 case "chat":
                     handleChat(conn, data);
+                    break;
+                case "getRooms":
+                    handleGetRooms(conn);
                     break;
                 default:
                     sendError(conn, "Tipo de mensaje desconocido");
@@ -167,6 +186,9 @@ public class GameWebSocketServer extends WebSocketServer {
 
         // Autenticación simple (en producción usar hash y base de datos)
         if (authenticateUser(username, password)) {
+            // Recargar mapas automáticamente al autenticar
+            reloadRooms();
+
             String userId = UUID.randomUUID().toString();
             User user = new User(userId, username, conn);
             users.put(userId, user);
@@ -396,6 +418,19 @@ public class GameWebSocketServer extends WebSocketServer {
                     "message", message
             )));
         }
+    }
+
+    private void handleGetRooms(WebSocket conn) {
+        String userId = connectionToUserId.get(conn);
+        if (userId == null) {
+            sendError(conn, "No autenticado");
+            return;
+        }
+
+        // Recargar mapas automáticamente al solicitar la lista
+        reloadRooms();
+
+        sendToClient(conn, createMessage("roomsList", Map.of("rooms", getRoomsList())));
     }
 
     private void startGameLoop() {
