@@ -237,7 +237,7 @@ public class GameWebSocketServer extends WebSocketServer {
                 "player", player.toMap()
         )));
 
-        if(room.players.size() >= room.needUsers)
+        if(!room.gameStarted && room.players.size() >= room.needUsers)
             this.startGame(room);
     }
 
@@ -253,6 +253,8 @@ public class GameWebSocketServer extends WebSocketServer {
     private void backToWaitingRoom(GameRoom room) {
         scheduler.schedule(() -> {
             room.world = room.waitingRoom;
+            room.gameStarted = false;
+            room.platforms.clear();
             resetPlayers(room,200);
 
             broadcastToRoom(
@@ -275,6 +277,8 @@ public class GameWebSocketServer extends WebSocketServer {
             room.initializeKey();
             
             resetPlayers(room,0);
+
+            room.gameStarted = true;
 
             broadcastToRoom(
                     room.id,
@@ -647,6 +651,9 @@ public class GameWebSocketServer extends WebSocketServer {
                 if (room.key.checkCollision(player)) {
                     // Jugador recoge la llave
                     room.key.isCollected = true;
+                    int tileX = (int)(room.key.x / SIZE_TILE);
+                    int tileY = (int)(room.key.y / SIZE_TILE);
+                    room.world[tileY][tileX] = 0;
                     room.key.carriedByPlayerId = player.id;
                     player.hasKey = true;
                     System.out.println("[Llave] " + player.username + " recogió la llave");

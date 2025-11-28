@@ -1,17 +1,18 @@
 package org.server;
 
-import com.google.gson.Gson;
 import java.io.FileReader;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+
+import com.google.gson.Gson;
 
 public class GameRoom {
     public boolean canUpdate = true;
+    public boolean gameStarted = false;
     public String id;
     public String name;
     public int[][] world;
