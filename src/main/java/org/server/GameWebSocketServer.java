@@ -272,6 +272,7 @@ public class GameWebSocketServer extends WebSocketServer {
             // IMPORTANTE: Solo inicializar plataformas cuando el juego REALMENTE comienza
             room.platforms.clear();
             room.initializePlatforms();
+            room.initializeKey();
             
             resetPlayers(room,0);
 
@@ -284,12 +285,47 @@ public class GameWebSocketServer extends WebSocketServer {
 
     private void restartGame(GameRoom room) {
         scheduler.schedule(() -> {
+            // Reiniciar el mapa al estado original
+            room.world = new int[room.gameWorld.length][];
+            for (int i = 0; i < room.gameWorld.length; i++) {
+                room.world[i] = room.gameWorld[i].clone();
+            }
+            
+            // Reiniciar plataformas
+            room.platforms.clear();
+            room.initializePlatforms();
+            
+            // Reiniciar llave
+            room.initializeKey();
+            
+            // Reiniciar estado del juego
+            room.doorOpen = false;
+            room.completedPlayers = 0;
+            
+            // Hacer visibles a todos los jugadores
+            for (Player player : room.players.values()) {
+                player.isVisible = true;
+                player.hasKey = false;
+            }
+            
             resetPlayers(room,0);
 
             broadcastToRoom(
                     room.id,
                     createMessage("restartGame", Map.of())
             );
+            
+            // Enviar actualización inmediata con las nuevas posiciones
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", room.getPlayersData());
+            updateData.put("platforms", room.getPlatformsData());
+            updateData.put("requiresKey", room.key != null);
+            updateData.put("doorOpen", room.doorOpen);
+            if (room.getKeyData() != null) {
+                updateData.put("key", room.getKeyData());
+            }
+            broadcastToRoom(room.id, createMessage("gameUpdate", updateData));
+            
             room.canUpdate = true;
         }, 3, TimeUnit.SECONDS);
     }
@@ -498,11 +534,19 @@ public class GameWebSocketServer extends WebSocketServer {
 
             room.updatePlatformLogic();
 
+            // ========== MANEJAR SISTEMA DE LLAVES ==========
+            handleKeySystem(room);
+
             // Enviar actualización a todos los jugadores en la sala
-            broadcastToRoom(room.id, createMessage("gameUpdate", Map.of(
-                    "players", room.getPlayersData(),
-                    "platforms", room.getPlatformsData()
-            )));
+            Map<String, Object> updateData = new HashMap<>();
+            updateData.put("players", room.getPlayersData());
+            updateData.put("platforms", room.getPlatformsData());
+            updateData.put("requiresKey", room.key != null);
+            updateData.put("doorOpen", room.doorOpen);
+            if (room.getKeyData() != null) {
+                updateData.put("key", room.getKeyData());
+            }
+            broadcastToRoom(room.id, createMessage("gameUpdate", updateData));
         }
     }
 
@@ -511,6 +555,12 @@ public class GameWebSocketServer extends WebSocketServer {
      **/
     private void checkWinnerTiles(Player player, GameRoom room) {
         if(!player.isVisible) return;
+
+        // Si hay llave en el nivel, la puerta debe estar abierta para ganar
+        if (room.key != null && !room.doorOpen) {
+            return; // Puerta cerrada, no se puede ganar
+        }
+
         // Calcular los tiles que ocupa el jugador
         int leftTile = (int)(player.x / SIZE_TILE);
         int rightTile = (int)((player.x + player.width - 1) / SIZE_TILE);
@@ -527,13 +577,110 @@ public class GameWebSocketServer extends WebSocketServer {
         for (int y = topTile; y <= bottomTile; y++) {
             for (int x = leftTile; x <= rightTile; x++) {
                 if (WINNER_TILES.contains(room.world[y][x])) {
+                    System.out.println("[META] ¡" + player.username + " tocó la meta! Tile: (" + x + "," + y + "), completedPlayers antes: " + room.completedPlayers);
                     player.isVisible = false;
+                    
+                    // Si el jugador tiene la llave, hacerla desaparecer
+                    if (player.hasKey && room.key != null) {
+                        player.hasKey = false;
+                        room.key.carriedByPlayerId = null;
+                        room.key.isCollected = false;
+                        System.out.println("[Llave] Desaparecida - " + player.username + " llegó a la meta");
+                    }
+                    
                     room.completedPlayers++;
+                    System.out.println("[META] completedPlayers ahora: " + room.completedPlayers + ", total players: " + room.players.size());
                     if (room.completedPlayers >= room.players.size()) {
+                        System.out.println("[META] ¡Todos los jugadores completaron! Enviando gameWin");
+                        room.canUpdate = false; // Detener actualizaciones del juego
                         broadcastToRoom(room.id, createMessage("gameWin", Map.of()));
+                        this.restartGame(room); // Reiniciar el juego después de ganar
                     }
                     return;
                 }
+            }
+        }
+    }
+
+    /**
+     * Maneja todo el sistema de llaves: colección, robo y victoria
+     */
+    private void handleKeySystem(GameRoom room) {
+        if (room.key == null) return;
+
+        // Verificar si la animación de apertura de puerta terminó y eliminar la llave
+        if (room.key.isOpeningDoor && System.currentTimeMillis() - room.key.doorOpenStartTime > 1000) {
+            System.out.println("[Llave] Llave desapareció después de abrir la puerta");
+            // Quitar hasKey de cualquier jugador que la tuviera
+            for (Player player : room.players.values()) {
+                player.hasKey = false;
+            }
+            room.key = null; // Eliminar la llave completamente
+            return; // Salir temprano ya que no hay llave
+        }
+
+        // Actualizar animación flotante de la llave
+        room.key.updateFloatAnimation();
+
+        // Actualizar posición de la llave si está siendo llevada
+        if (room.key.carriedByPlayerId != null) {
+            Player carrier = room.getPlayer(room.key.carriedByPlayerId);
+            if (carrier != null) {
+                room.key.updatePosition(carrier);
+                
+                // Verificar si la llave está tocando la puerta
+                if (!room.doorOpen && room.key.checkDoorCollision(room)) {
+                    room.doorOpen = true;
+                    room.key.isOpeningDoor = true;
+                    room.key.doorOpenStartTime = System.currentTimeMillis();
+                    System.out.println("[Puerta] ¡Puerta abierta por " + carrier.username + "!");
+                }
+            }
+        }
+
+        // Verificar si algún jugador toca la llave en el mapa (solo si no está abriendo puerta)
+        if (!room.key.isOpeningDoor) {
+            for (Player player : room.players.values()) {
+                if (!player.isVisible) continue;
+
+                if (room.key.checkCollision(player)) {
+                    // Jugador recoge la llave
+                    room.key.isCollected = true;
+                    room.key.carriedByPlayerId = player.id;
+                    player.hasKey = true;
+                    System.out.println("[Llave] " + player.username + " recogió la llave");
+                    break;
+                }
+            }
+        }
+
+        // Verificar si algún jugador roba la llave a otro (solo si no está abriendo puerta)
+        boolean theftOccurred = false;
+        if (!room.key.isOpeningDoor) {
+            for (Player stealer : room.players.values()) {
+                if (!stealer.isVisible || stealer.hasKey) continue;
+
+                for (Player carrier : room.players.values()) {
+                    if (!carrier.isVisible || carrier.id.equals(stealer.id) || !carrier.hasKey) continue;
+
+                    if (room.key.checkPlayerSteal(stealer, carrier)) {
+                        // Robo exitoso
+                        carrier.hasKey = false;
+                        stealer.hasKey = true;
+                        
+                        // Iniciar movimiento suave hacia el nuevo portador
+                        room.key.targetX = stealer.x + (stealer.width - room.key.WIDTH) / 2;
+                        room.key.targetY = stealer.y - room.key.HEIGHT - 25 + room.key.floatOffset; // Subir más la llave
+                        room.key.isMovingToTarget = true;
+                        room.key.transferStartTime = System.currentTimeMillis();
+                        
+                        room.key.carriedByPlayerId = stealer.id;
+                        System.out.println("[Llave] " + stealer.username + " le robó la llave a " + carrier.username);
+                        theftOccurred = true;
+                        break;
+                    }
+                }
+                if (theftOccurred) break; // Salir del loop externo también
             }
         }
     }
@@ -548,7 +695,18 @@ public class GameWebSocketServer extends WebSocketServer {
                     player.x + player.width > platform.x &&
                     player.y < platform.y + platform.height &&
                     player.y + player.height > platform.y) {
-                return platform;
+                
+                // Si el jugador está encima de la plataforma (con margen) y la plataforma está en movimiento,
+                // permitir movimiento horizontal
+                float playerBottomY = player.y + player.height;
+                boolean isOnTopOfPlatform = playerBottomY >= platform.y - 10 && 
+                                          playerBottomY <= platform.y + 20 &&
+                                          platform.isMoving;
+                
+                if (!isOnTopOfPlatform) {
+                    return platform; // Bloquear movimiento
+                }
+                // Si está encima y la plataforma se mueve, no bloquear
             }
         }
         return null;
